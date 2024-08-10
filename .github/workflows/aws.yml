@@ -20,7 +20,7 @@ jobs:
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-      - name: Enabling RDP Access [CPU 2 Core - 7GB Ram - 256 SSD]
+      - name: Enabling RDP Access [CPU 20 Core - 20GB Ram - 256 SSD]
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
