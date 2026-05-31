@@ -1,17 +1,17 @@
-name: Server Test
+name: AWS
 
 on:
   workflow_dispatch:
 
 jobs:
   test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 30
 
     steps:
       - name: Check real server
         run: |
-          echo "Runner is working on the real server"
+          echo "Running on real server"
           hostname
           whoami
           pwd
@@ -21,7 +21,7 @@ jobs:
 
       - name: Check OpenClaw
         run: |
-          echo "Checking OpenClaw service"
+          echo "Checking OpenClaw"
           systemctl is-active openclaw-gateway.service || true
           systemctl status openclaw-gateway.service --no-pager || true
           ps -eo user,pid,cmd | grep -i openclaw | grep -v grep || true
