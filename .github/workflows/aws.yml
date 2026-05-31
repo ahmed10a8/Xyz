@@ -1,117 +1,38 @@
-name: VPS RDP Preview
-
-on:
-  workflow_dispatch:
-    inputs:
-      session_minutes:
-        description: "Session duration in minutes"
-        required: true
-        default: "60"
-
-concurrency:
-  group: vps-rdp-preview
-  cancel-in-progress: true
+name: AWS
+on: workflow_dispatch
 
 jobs:
-  rdp-preview:
-    runs-on: self-hosted
-    timeout-minutes: 120
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 9999
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check ngrok token
-        shell: powershell
+      - name: Downloading ngrok
         run: |
-          if (-not $Env:NGROK_AUTH_TOKEN) {
-            Write-Error "NGROK_AUTH_TOKEN secret is missing."
-            exit 1
-          }
+          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+          Invoke-WebRequest https://raw.githubusercontent.com/hellcrusher1/Xyz/main/start.bat -OutFile start.bat
+
+      - name: Extracting ngrok Files
+        run: Expand-Archive ngrok.zip
+
+      - name: Connecting ngrok Account
+        run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-      - name: Download ngrok
-        shell: powershell
+      - name: Enabling RDP Access [CPU 20 Core - 20GB Ram - 256 SSD]
         run: |
-          if (!(Test-Path "ngrok.exe")) {
-            Invoke-WebRequest `
-              -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" `
-              -OutFile "ngrok.zip"
-
-            Expand-Archive "ngrok.zip" -DestinationPath "." -Force
-          }
-
-          .\ngrok.exe version
-
-      - name: Connect ngrok account
-        shell: powershell
-        run: |
-          .\ngrok.exe config add-authtoken $Env:NGROK_AUTH_TOKEN
-        env:
-          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-
-      - name: Enable RDP on owned VPS
-        shell: powershell
-        run: |
-          Set-ItemProperty `
-            -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" `
-            -Name "fDenyTSConnections" `
-            -Value 0
-
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
 
-          Set-ItemProperty `
-            -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" `
-            -Name "UserAuthentication" `
-            -Value 1
+      - name: Creating Tunnel
+        run: Start-Process Powershell -ArgumentList '-Noexit -Command ".\ngrok\ngrok.exe tcp 3389"'
 
-      - name: Start ngrok TCP tunnel
-        shell: powershell
+      - name: Connect to RDP [Copy ip, username, password from here]
+        run: cmd /c start.bat
+
+      - name: TimeCount
         run: |
-          Start-Process `
-            -FilePath ".\ngrok.exe" `
-            -ArgumentList "tcp 3389 --log=stdout" `
-            -WindowStyle Hidden
-
-          Start-Sleep -Seconds 8
-
-      - name: Prepare Windows user and print connection
-        shell: cmd
-        run: |
-          if not exist start.bat (
-            echo start.bat not found in repository.
-            exit /b 1
-          )
-
-          call start.bat
-
-      - name: Upload connection details
-        uses: actions/upload-artifact@v4
-        with:
-          name: rdp-connection
-          path: |
-            connection.txt
-            ngrok_url.txt
-            rdp_address.txt
-          if-no-files-found: warn
-
-      - name: Keep session open for selected duration
-        shell: powershell
-        run: |
-          $minutes = [int]"${{ github.event.inputs.session_minutes }}"
-
-          if ($minutes -lt 5) {
-            $minutes = 5
-          }
-
-          if ($minutes -gt 120) {
-            $minutes = 120
-          }
-
-          Write-Host "Session will stay open for $minutes minutes."
-
-          for ($i = 1; $i -le $minutes; $i++) {
-            Write-Host "Running minute $i of $minutes"
-            Start-Sleep -Seconds 60
-          }
+          Invoke-WebRequest https://raw.githubusercontent.com/hellcrusher1/Xyz/main/loop.ps1 -OutFile loop.ps1
+          ./loop.ps1
